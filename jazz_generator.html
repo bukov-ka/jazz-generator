@@ -3,7 +3,6 @@
 <head>
     <meta charset="UTF-8">
     <title>Infinite Jazz Generator</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
     <style>
         * { box-sizing: border-box; }
         body { 
@@ -53,6 +52,11 @@
             transform: translateY(-2px);
             box-shadow: 0 6px 20px rgba(233, 69, 96, 0.6);
         }
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
         button.playing {
             background: linear-gradient(135deg, #c0392b, #e74c3c);
         }
@@ -77,7 +81,7 @@
             gap: 20px;
             flex-wrap: wrap;
             justify-content: center;
-            max-width: 800px;
+            max-width: 900px;
         }
         
         #display { 
@@ -105,19 +109,19 @@
         .status { font-size: 13px; color: #888; }
         .note-log { font-size: 11px; color: #aaa; margin-top: 10px; height: 1.5em; }
         
-        /* Configuration Panel */
-        #config-panel {
+        /* Configuration Panels */
+        .config-panel {
             background: rgba(0, 0, 0, 0.4);
             border: 2px solid #4a5568;
             border-radius: 15px;
             padding: 20px;
-            width: 320px;
+            width: 280px;
             backdrop-filter: blur(10px);
         }
         
         .config-title {
             color: #e94560;
-            font-size: 14px;
+            font-size: 12px;
             font-weight: bold;
             margin-bottom: 15px;
             text-transform: uppercase;
@@ -127,14 +131,14 @@
         }
         
         .config-group {
-            margin-bottom: 18px;
+            margin-bottom: 14px;
         }
         
         .config-group label {
             display: block;
-            font-size: 11px;
+            font-size: 10px;
             color: #a0aec0;
-            margin-bottom: 6px;
+            margin-bottom: 5px;
             text-transform: uppercase;
             letter-spacing: 1px;
         }
@@ -148,7 +152,7 @@
             padding: 8px 10px;
             border-radius: 6px;
             font-family: inherit;
-            font-size: 13px;
+            font-size: 12px;
         }
         
         .config-group select:focus {
@@ -158,6 +162,7 @@
         
         .config-group input[type="range"] {
             -webkit-appearance: none;
+            appearance: none;
             height: 6px;
             padding: 0;
             cursor: pointer;
@@ -165,8 +170,8 @@
         
         .config-group input[type="range"]::-webkit-slider-thumb {
             -webkit-appearance: none;
-            width: 16px;
-            height: 16px;
+            width: 14px;
+            height: 14px;
             background: #e94560;
             border-radius: 50%;
             cursor: pointer;
@@ -175,9 +180,9 @@
         .range-labels {
             display: flex;
             justify-content: space-between;
-            font-size: 10px;
+            font-size: 9px;
             color: #718096;
-            margin-top: 4px;
+            margin-top: 3px;
         }
         
         .range-value {
@@ -187,11 +192,32 @@
         
         .config-row {
             display: flex;
-            gap: 12px;
+            gap: 10px;
         }
         
         .config-row .config-group {
             flex: 1;
+        }
+        
+        /* Humanization panel special color */
+        .humanize-panel {
+            border-color: #48bb78;
+        }
+        .humanize-panel .config-title {
+            color: #48bb78;
+        }
+        .humanize-panel input[type="range"]::-webkit-slider-thumb {
+            background: #48bb78;
+        }
+        
+        /* Loading indicator */
+        .loading {
+            color: #ffd369;
+            animation: pulse 1.5s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
         }
     </style>
 </head>
@@ -213,8 +239,9 @@
         <div class="note-log" id="noteLog"></div>
     </div>
     
-    <div id="config-panel">
-        <div class="config-title">⚙ Configuration</div>
+    <!-- Musical Config Panel -->
+    <div class="config-panel">
+        <div class="config-title">🎵 Musical</div>
         
         <div class="config-row">
             <div class="config-group">
@@ -230,9 +257,9 @@
                 <label>Swing</label>
                 <input type="range" id="swingSlider" min="0" max="50" value="30">
                 <div class="range-labels">
-                    <span>Straight</span>
+                    <span>0%</span>
                     <span class="range-value" id="swingValue">30%</span>
-                    <span>Heavy</span>
+                    <span>50%</span>
                 </div>
             </div>
         </div>
@@ -260,391 +287,464 @@
         
         <div class="config-row">
             <div class="config-group">
-                <label>Lead Volume</label>
-                <input type="range" id="leadVol" min="0" max="100" value="70">
+                <label>Lead Vol</label>
+                <input type="range" id="leadVol" min="0" max="100" value="75">
                 <div class="range-labels">
                     <span>0</span>
-                    <span class="range-value" id="leadVolValue">70%</span>
+                    <span class="range-value" id="leadVolValue">75%</span>
                     <span>100</span>
                 </div>
             </div>
             <div class="config-group">
-                <label>Bass Volume</label>
-                <input type="range" id="bassVol" min="0" max="100" value="65">
+                <label>Bass Vol</label>
+                <input type="range" id="bassVol" min="0" max="100" value="70">
                 <div class="range-labels">
                     <span>0</span>
-                    <span class="range-value" id="bassVolValue">65%</span>
+                    <span class="range-value" id="bassVolValue">70%</span>
                     <span>100</span>
                 </div>
             </div>
         </div>
+    </div>
+    
+    <!-- Humanization Panel -->
+    <div class="config-panel humanize-panel">
+        <div class="config-title">🎭 Humanization</div>
         
         <div class="config-group">
-            <label>Reverb Mix</label>
-            <input type="range" id="reverbMix" min="0" max="80" value="35">
+            <label>Timing Variation</label>
+            <input type="range" id="timingVar" min="0" max="100" value="40">
             <div class="range-labels">
-                <span>Dry</span>
-                <span class="range-value" id="reverbValue">35%</span>
-                <span>Wet</span>
+                <span>Robot</span>
+                <span class="range-value" id="timingVarValue">40%</span>
+                <span>Loose</span>
+            </div>
+        </div>
+        
+        <div class="config-group">
+            <label>Velocity Variation</label>
+            <input type="range" id="velocityVar" min="0" max="100" value="50">
+            <div class="range-labels">
+                <span>Flat</span>
+                <span class="range-value" id="velocityVarValue">50%</span>
+                <span>Dynamic</span>
+            </div>
+        </div>
+        
+        <div class="config-group">
+            <label>Note Length Variation</label>
+            <input type="range" id="lengthVar" min="0" max="100" value="35">
+            <div class="range-labels">
+                <span>Exact</span>
+                <span class="range-value" id="lengthVarValue">35%</span>
+                <span>Loose</span>
+            </div>
+        </div>
+        
+        <div class="config-group">
+            <label>Ghost Notes (Bass)</label>
+            <input type="range" id="ghostNotes" min="0" max="100" value="30">
+            <div class="range-labels">
+                <span>None</span>
+                <span class="range-value" id="ghostNotesValue">30%</span>
+                <span>Many</span>
             </div>
         </div>
     </div>
 </div>
 
+<script src="https://unpkg.com/soundfont-player@0.12.0/dist/soundfont-player.min.js"></script>
 <script>
 /**
  * CONFIGURATION & THEORY
  */
-const TEMPO = 110; // Slightly laid back
-const LOOKAHEAD = 1.0; // Seconds to schedule ahead
-const ROOT_MIDI = 60; // Middle C
 
 // Musical Constants
 const SCALES = {
-    "C_MAJOR": [0, 2, 4, 5, 7, 9, 11], // C D E F G A B
-    // A Phrygian Dominant (5th mode of D harmonic minor) for A7
-    "A_PHRYGIAN_DOM": [9, 10, 1, 2, 4, 5, 7] // A Bb C# D E F G
+    "C_MAJOR": [0, 2, 4, 5, 7, 9, 11],
+    "A_PHRYGIAN_DOM": [9, 10, 1, 2, 4, 5, 7]
 };
 
 const CHORD_PROGRESSION = [
-    { name: "Dm7",   root: 2,  type: "m7",   scale: "C_MAJOR",        tones: [2, 5, 9, 0] },   // D F A C
-    { name: "G7",    root: 7,  type: "7",    scale: "C_MAJOR",        tones: [7, 11, 2, 5] },  // G B D F
-    { name: "Cmaj7", root: 0,  type: "maj7", scale: "C_MAJOR",        tones: [0, 4, 7, 11] },  // C E G B
-    { name: "A7",    root: 9,  type: "7",    scale: "A_PHRYGIAN_DOM", tones: [9, 1, 4, 7] }    // A C# E G
+    { name: "Dm7",   root: 2,  type: "m7",   scale: "C_MAJOR",        tones: [2, 5, 9, 0] },
+    { name: "G7",    root: 7,  type: "7",    scale: "C_MAJOR",        tones: [7, 11, 2, 5] },
+    { name: "Cmaj7", root: 0,  type: "maj7", scale: "C_MAJOR",        tones: [0, 4, 7, 11] },
+    { name: "A7",    root: 9,  type: "7",    scale: "A_PHRYGIAN_DOM", tones: [9, 1, 4, 7] }
 ];
 
-// Melody Rhythm Patterns (1 = play, 0 = rest)
-// 8 slots per bar (eighth notes)
+// Melody Rhythm Patterns
 const MELODY_RHYTHMS = {
     sparse: [
-        [0,0, 1,0, 0,0, 1,0], // Very open
-        [1,0, 0,0, 0,1, 0,0], // Minimal
-        [0,0, 0,1, 0,0, 1,0], // Off-beat hits
+        [0,0, 1,0, 0,0, 1,0],
+        [1,0, 0,0, 0,1, 0,0],
+        [0,0, 0,1, 0,0, 1,0],
     ],
     moderate: [
-        [0,1, 1,0, 1,1, 1,0], // Syncopated
-        [1,0, 1,0, 1,0, 1,0], // Walking
-        [0,0, 1,0, 0,1, 1,0], // Spacey
-        [1,0, 0,1, 1,0, 0,1], // Bouncy
+        [0,1, 1,0, 1,1, 1,0],
+        [1,0, 1,0, 1,0, 1,0],
+        [0,0, 1,0, 0,1, 1,0],
+        [1,0, 0,1, 1,0, 0,1],
     ],
     busy: [
-        [1,1, 1,1, 0,1, 1,0], // Bebop run
-        [1,1, 0,1, 1,1, 1,0], // Busy
-        [1,1, 1,0, 1,1, 1,1], // Very active
-        [0,1, 1,1, 1,1, 0,1], // Pickup run
+        [1,1, 1,1, 0,1, 1,0],
+        [1,1, 0,1, 1,1, 1,0],
+        [1,1, 1,0, 1,1, 1,1],
+        [0,1, 1,1, 1,1, 0,1],
     ]
 };
 
-// Comping Rhythm Patterns (chord voicings)
-// Each pattern: array of { beat: 0-7 (eighth notes), duration: note length }
+// Comping Patterns
 const COMP_PATTERNS = {
-    whole: [
-        [{ beat: 0, dur: "1n" }] // Whole note, simple pad
-    ],
+    whole: [[{ beat: 0, dur: 1.8 }]],
     charleston: [
-        // Classic "Charleston" rhythm: beat 1 and the "and" of 2
-        [{ beat: 0, dur: "4n" }, { beat: 3, dur: "8n" }],
-        [{ beat: 0, dur: "8n" }, { beat: 3, dur: "4n" }],
-        [{ beat: 0, dur: "4n" }, { beat: 3, dur: "8n" }, { beat: 6, dur: "8n" }],
+        [{ beat: 0, dur: 0.4 }, { beat: 3, dur: 0.3 }],
+        [{ beat: 0, dur: 0.3 }, { beat: 3, dur: 0.5 }],
+        [{ beat: 0, dur: 0.4 }, { beat: 3, dur: 0.25 }, { beat: 6, dur: 0.25 }],
     ],
     bossa: [
-        // Bossa nova anticipated rhythm
-        [{ beat: 0, dur: "8n" }, { beat: 3, dur: "8n" }, { beat: 6, dur: "8n" }],
-        [{ beat: 0, dur: "8n" }, { beat: 2, dur: "8n" }, { beat: 5, dur: "8n" }],
+        [{ beat: 0, dur: 0.3 }, { beat: 3, dur: 0.3 }, { beat: 6, dur: 0.3 }],
+        [{ beat: 0, dur: 0.25 }, { beat: 2, dur: 0.25 }, { beat: 5, dur: 0.3 }],
     ],
     driving: [
-        // Four-to-the-floor with accents
-        [{ beat: 0, dur: "8n" }, { beat: 2, dur: "8n" }, { beat: 4, dur: "8n" }, { beat: 6, dur: "8n" }],
+        [{ beat: 0, dur: 0.2 }, { beat: 2, dur: 0.2 }, { beat: 4, dur: 0.2 }, { beat: 6, dur: 0.2 }],
     ],
     sparse: [
-        // Very minimal - just accents
-        [{ beat: 0, dur: "2n" }],
-        [{ beat: 4, dur: "2n" }],
-        [{ beat: 0, dur: "4n" }],
+        [{ beat: 0, dur: 0.8 }],
+        [{ beat: 4, dur: 0.8 }],
     ],
     busy: [
-        // Bebop style - more active
-        [{ beat: 0, dur: "8n" }, { beat: 2, dur: "8n" }, { beat: 3, dur: "8n" }, { beat: 5, dur: "8n" }, { beat: 7, dur: "8n" }],
-        [{ beat: 1, dur: "8n" }, { beat: 3, dur: "8n" }, { beat: 4, dur: "8n" }, { beat: 6, dur: "8n" }],
+        [{ beat: 0, dur: 0.2 }, { beat: 2, dur: 0.15 }, { beat: 3, dur: 0.2 }, { beat: 5, dur: 0.15 }, { beat: 7, dur: 0.2 }],
+        [{ beat: 1, dur: 0.2 }, { beat: 3, dur: 0.2 }, { beat: 4, dur: 0.15 }, { beat: 6, dur: 0.2 }],
     ]
 };
 
-// Current configuration (reactive)
+// Configuration state
 const CONFIG = {
     tempo: 110,
     swing: 0.3,
     compStyle: 'charleston',
     melodyDensity: 'moderate',
-    leadVol: -8,
-    bassVol: -6,
-    reverbMix: 0.35
+    leadVol: 0.75,
+    bassVol: 0.70,
+    // Humanization
+    timingVar: 0.40,      // 0-1: timing randomization (max ±30ms)
+    velocityVar: 0.50,    // 0-1: velocity variation
+    lengthVar: 0.35,      // 0-1: note length variation
+    ghostNotes: 0.30,     // 0-1: probability of ghost notes on bass
 };
 
 /**
- * AUDIO ENGINE (Tone.js wrapper)
+ * AUDIO ENGINE (smplr + Web Audio)
  */
-let synth, bassSynth, chordSynth;
-let reverb, delay; // Store references for live control
+let audioContext;
+let vibraphone, electricPiano, acousticBass;
 let isPlaying = false;
 let audioInitialized = false;
+let schedulerInterval = null;
+
+// Timing state
+let startTime = 0;
+let currentBar = 0;
 
 async function initAudio() {
     if (audioInitialized) return;
     
-    await Tone.start();
+    const statusEl = document.getElementById('phraseStatus');
+    statusEl.textContent = "Loading samples...";
+    statusEl.classList.add('loading');
     
-    // Create effects chain FIRST (don't connect to destination individually)
-    reverb = new Tone.Reverb({ decay: 2.5, wet: CONFIG.reverbMix });
-    delay = new Tone.FeedbackDelay({ 
-        delayTime: "8n.", // Dotted eighth for jazz feel
-        feedback: 0.15,   // Subtle
-        wet: 0.12 
-    });
-    
-    // Master chain: delay -> reverb -> destination
-    delay.connect(reverb);
-    reverb.toDestination();
-    
-    // Separate dry path with less volume
-    const dryGain = new Tone.Gain(0.7).toDestination();
-    
-    // 1. Lead Synth (Vibraphone/Electric Piano feel)
-    // Use FM synthesis for bell-like vibraphone tone
-    synth = new Tone.PolySynth(Tone.FMSynth, {
-        harmonicity: 3.01,
-        modulationIndex: 1.5,
-        oscillator: { type: "sine" },
-        modulation: { type: "sine" },
-        envelope: { attack: 0.001, decay: 0.4, sustain: 0.15, release: 1.2 },
-        modulationEnvelope: { attack: 0.002, decay: 0.2, sustain: 0, release: 0.3 },
-        volume: CONFIG.leadVol
-    });
-    synth.connect(dryGain);
-    synth.connect(delay); // Goes through delay -> reverb chain
+    try {
+        audioContext = new AudioContext();
+        console.log("AudioContext created, state:", audioContext.state);
+        
+        // Resume if suspended (required by some browsers)
+        if (audioContext.state === 'suspended') {
+            await audioContext.resume();
+            console.log("AudioContext resumed");
+        }
+        
+        console.log("Loading instruments from soundfont...");
+        
+        // Load sample-based instruments using soundfont-player
+        // Using MusyngKite soundfont for good quality
+        const sf = 'MusyngKite';
+        
+        [vibraphone, electricPiano, acousticBass] = await Promise.all([
+            Soundfont.instrument(audioContext, 'vibraphone', { soundfont: sf }),
+            Soundfont.instrument(audioContext, 'electric_piano_1', { soundfont: sf }),
+            Soundfont.instrument(audioContext, 'acoustic_bass', { soundfont: sf })
+        ]);
+        
+        console.log("All instruments loaded!");
+        statusEl.textContent = "Ready to swing!";
+        statusEl.classList.remove('loading');
+        
+        audioInitialized = true;
+    } catch (e) {
+        console.error("Error initializing audio:", e);
+        statusEl.textContent = "Error: " + e.message;
+        statusEl.classList.remove('loading');
+        throw e;
+    }
+}
 
-    // 2. Comping Chords (Warm Rhodes-like) - only reverb, no delay
-    chordSynth = new Tone.PolySynth(Tone.FMSynth, {
-        harmonicity: 2,
-        modulationIndex: 0.8,
-        oscillator: { type: "sine" },
-        modulation: { type: "triangle" },
-        envelope: { attack: 0.02, decay: 0.8, sustain: 0.3, release: 1.5 },
-        modulationEnvelope: { attack: 0.05, decay: 0.3, sustain: 0.2, release: 0.5 },
-        volume: -16
-    });
-    chordSynth.connect(reverb); // Direct to reverb only
-    
-    // 3. Upright Bass - Clean MonoSynth with lowpass filter (NO MembraneSynth!)
-    const bassFilter = new Tone.Filter({
-        type: "lowpass",
-        frequency: 800,
-        rolloff: -24
-    }).toDestination();
-    
-    bassSynth = new Tone.MonoSynth({
-        oscillator: { type: "triangle" },
-        envelope: { attack: 0.02, decay: 0.3, sustain: 0.6, release: 0.4 },
-        filterEnvelope: {
-            attack: 0.01,
-            decay: 0.1,
-            sustain: 0.5,
-            release: 0.3,
-            baseFrequency: 200,
-            octaves: 2
-        },
-        volume: CONFIG.bassVol
-    });
-    bassSynth.connect(bassFilter); // Bass stays DRY (no reverb = tight low end)
+/**
+ * HUMANIZATION HELPERS
+ */
+function humanizeTime(baseTime) {
+    // Add ±30ms timing variation scaled by CONFIG.timingVar
+    const maxOffset = 0.030 * CONFIG.timingVar;
+    return baseTime + (Math.random() - 0.5) * 2 * maxOffset;
+}
 
-    Tone.Transport.bpm.value = CONFIG.tempo;
-    Tone.Transport.swing = CONFIG.swing;
-    Tone.Transport.swingSubdivision = "8n";
+function humanizeVelocity(baseVelocity, isAccent = false) {
+    // Base velocity with variation
+    const variation = CONFIG.velocityVar * 0.4; // Max ±40% variation
+    let vel = baseVelocity + (Math.random() - 0.5) * 2 * variation * baseVelocity;
     
-    audioInitialized = true;
+    // Accents get a boost
+    if (isAccent) vel *= 1.15;
+    
+    // Clamp between 0.2 and 1.0
+    return Math.max(0.2, Math.min(1.0, vel));
+}
+
+function humanizeDuration(baseDuration) {
+    // Vary note length by ±30%
+    const variation = CONFIG.lengthVar * 0.3;
+    const multiplier = 1 + (Math.random() - 0.5) * 2 * variation;
+    return baseDuration * multiplier;
 }
 
 /**
  * GENERATOR LOGIC
  */
-
-// Helper: MIDI handling
 function getMidi(pc, octave) { return pc + (octave + 1) * 12; }
 function randomEl(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
-
-// Helper: Find nearest note in a scale/chord array to a target pitch
 function findNearest(target, pool) {
     return pool.reduce((prev, curr) => 
         Math.abs(curr - target) < Math.abs(prev - target) ? curr : prev
     );
 }
 
-// Global State
-let lastNoteMidi = 72; // Start around C5
+// Melody state
+let lastNoteMidi = 72;
 
-// The Core Generator Function
-function generatePhrase(barIndex, time, chordIdx) {
+function getEighthNoteDuration() {
+    return 60 / CONFIG.tempo / 2; // seconds per eighth note
+}
+
+function generateBar(barIndex, barStartTime) {
+    const chordIdx = barIndex % 4;
     const chordDef = CHORD_PROGRESSION[chordIdx];
+    const eighthDur = getEighthNoteDuration();
     
-    // 1. Play Background Chord (Comping) with rhythmic patterns
-    // Drop-2 voicing for openness
+    console.log(`Bar ${barIndex}: ${chordDef.name}, startTime=${barStartTime.toFixed(2)}, currentTime=${audioContext.currentTime.toFixed(2)}`);
+    
+    // Apply swing to off-beats
+    function getSwungTime(beatIndex) {
+        const baseTime = barStartTime + beatIndex * eighthDur;
+        // Swing only affects odd eighth notes (the "ands")
+        if (beatIndex % 2 === 1) {
+            return baseTime + eighthDur * CONFIG.swing * 0.5;
+        }
+        return baseTime;
+    }
+    
+    // ============ 1. COMPING CHORDS ============
     const voicing = [
-        getMidi(chordDef.tones[0], 3),      // Root stays
-        getMidi(chordDef.tones[1], 2),      // 3rd dropped an octave  
-        getMidi(chordDef.tones[2], 3),      // 5th stays
-        getMidi(chordDef.tones[3], 3)       // 7th stays
+        getMidi(chordDef.tones[0], 3),
+        getMidi(chordDef.tones[1], 2),  // Drop-2
+        getMidi(chordDef.tones[2], 3),
+        getMidi(chordDef.tones[3], 3)
     ];
-    const chordFreqs = voicing.map(n => Tone.Frequency(n, "midi"));
     
-    // Get comping pattern based on current style
     const compPatterns = COMP_PATTERNS[CONFIG.compStyle];
     const compPattern = randomEl(compPatterns);
     
-    // Schedule each chord hit in the pattern
     compPattern.forEach(hit => {
-        const hitTime = time + Tone.Time("8n").toSeconds() * hit.beat;
-        // Vary velocity for groove
-        const vel = 0.4 + Math.random() * 0.25;
-        chordSynth.triggerAttackRelease(chordFreqs, hit.dur, hitTime, vel);
+        const hitTime = humanizeTime(getSwungTime(hit.beat));
+        const vel = humanizeVelocity(0.45, hit.beat === 0);
+        const dur = humanizeDuration(hit.dur);
+        
+        voicing.forEach(midi => {
+            electricPiano.play(midi, hitTime, {
+                gain: vel * CONFIG.leadVol * 0.7,
+                duration: dur
+            });
+        });
     });
     
-    // 2. Walking Bass - Play on all 4 beats for authentic jazz feel
+    // ============ 2. WALKING BASS ============
     const bassOctave = 2;
-    const scale = SCALES[chordDef.scale];
     const rootMidi = getMidi(chordDef.root, bassOctave);
+    const bassDur = eighthDur * 1.8; // Slightly longer than eighth
     
-    // Beat 1: Root
-    bassSynth.triggerAttackRelease(Tone.Frequency(rootMidi, "midi"), "8n", time);
+    // Beat 1: Root (strong)
+    acousticBass.play(rootMidi, humanizeTime(getSwungTime(0)), {
+        gain: humanizeVelocity(0.85, true) * CONFIG.bassVol,
+        duration: humanizeDuration(bassDur)
+    });
     
-    // Beat 2: 3rd or 5th (or passing tone)
-    const beat2Choices = [chordDef.tones[1], chordDef.tones[2]];
-    const beat2Note = getMidi(randomEl(beat2Choices), bassOctave);
-    bassSynth.triggerAttackRelease(Tone.Frequency(beat2Note, "midi"), "8n", time + Tone.Time("4n").toSeconds());
+    // Ghost note before beat 2 (if enabled)
+    if (Math.random() < CONFIG.ghostNotes * 0.5) {
+        const ghostNote = rootMidi + (Math.random() > 0.5 ? 2 : -2);
+        acousticBass.play(ghostNote, humanizeTime(getSwungTime(1)), {
+            gain: humanizeVelocity(0.25) * CONFIG.bassVol,
+            duration: eighthDur * 0.4
+        });
+    }
     
-    // Beat 3: 5th or a scale tone
+    // Beat 2: 3rd or 5th
+    const beat2Note = getMidi(randomEl([chordDef.tones[1], chordDef.tones[2]]), bassOctave);
+    acousticBass.play(beat2Note, humanizeTime(getSwungTime(2)), {
+        gain: humanizeVelocity(0.7) * CONFIG.bassVol,
+        duration: humanizeDuration(bassDur)
+    });
+    
+    // Ghost note before beat 3
+    if (Math.random() < CONFIG.ghostNotes * 0.4) {
+        const ghostNote = beat2Note + (Math.random() > 0.5 ? 1 : -1);
+        acousticBass.play(ghostNote, humanizeTime(getSwungTime(3)), {
+            gain: humanizeVelocity(0.22) * CONFIG.bassVol,
+            duration: eighthDur * 0.35
+        });
+    }
+    
+    // Beat 3: 5th
     const fifthMidi = getMidi(chordDef.tones[2], bassOctave);
-    bassSynth.triggerAttackRelease(Tone.Frequency(fifthMidi, "midi"), "8n", time + Tone.Time("4n").toSeconds() * 2);
+    acousticBass.play(fifthMidi, humanizeTime(getSwungTime(4)), {
+        gain: humanizeVelocity(0.72) * CONFIG.bassVol,
+        duration: humanizeDuration(bassDur)
+    });
     
-    // Beat 4: Chromatic approach to next root (half step below or above)
+    // Beat 4: Chromatic approach
     const nextChord = CHORD_PROGRESSION[(chordIdx + 1) % 4];
     const nextRoot = getMidi(nextChord.root, bassOctave);
-    const approachNote = nextRoot + (Math.random() > 0.5 ? 1 : -1); // Chromatic neighbor
-    bassSynth.triggerAttackRelease(Tone.Frequency(approachNote, "midi"), "8n", time + Tone.Time("4n").toSeconds() * 3);
+    const approachNote = nextRoot + (Math.random() > 0.5 ? 1 : -1);
+    acousticBass.play(approachNote, humanizeTime(getSwungTime(6)), {
+        gain: humanizeVelocity(0.68) * CONFIG.bassVol,
+        duration: humanizeDuration(bassDur * 0.9)
+    });
     
-    // Update UI
-    Tone.Draw.schedule(() => {
-        document.getElementById('currentChord').innerText = chordDef.name;
-        document.getElementById('phraseStatus').innerText = "Improvising...";
-    }, time);
-
-    // 3. Generate Melody with configured density
+    // ============ 3. MELODY ============
     const melodyPatterns = MELODY_RHYTHMS[CONFIG.melodyDensity];
     const pattern = randomEl(melodyPatterns);
     
-    // Convert generic pitch classes to actual MIDI pools
-    const scalePool = SCALES[chordDef.scale].map(pc => getMidi(pc, 4)).concat(SCALES[chordDef.scale].map(pc => getMidi(pc, 5)));
-    const chordPool = chordDef.tones.map(pc => getMidi(pc, 4)).concat(chordDef.tones.map(pc => getMidi(pc, 5)));
-    
-    // Guide Tones (3rd and 7th) for Voice Leading
-    // 3rd is index 1, 7th is index 3 in our tones array
+    const scalePool = SCALES[chordDef.scale].map(pc => getMidi(pc, 4))
+        .concat(SCALES[chordDef.scale].map(pc => getMidi(pc, 5)));
+    const chordPool = chordDef.tones.map(pc => getMidi(pc, 4))
+        .concat(chordDef.tones.map(pc => getMidi(pc, 5)));
     const guideTones = [chordDef.tones[1], chordDef.tones[3]].map(pc => getMidi(pc, 4));
-
+    
     pattern.forEach((step, index) => {
-        if (step === 0) return; // Rest
-
-        const beatOffset = index * 0.5; // Eighth notes
-        const noteTime = time + Tone.Time("8n").toSeconds() * index;
+        if (step === 0) return;
+        
+        const noteTime = humanizeTime(getSwungTime(index));
         const isStrongBeat = (index === 0 || index === 4);
         
-        // --- LOGIC IMPROVEMENT 1: Voice Leading ---
-        // If it's the first note of the bar, try to resolve to a guide tone (3rd/7th)
+        // Pitch selection
         let targetPool = scalePool;
-        let preferGuideTone = (index === 0 && Math.random() < 0.7); 
-
-        if (preferGuideTone) {
+        if (index === 0 && Math.random() < 0.7) {
             targetPool = guideTones;
         } else if (isStrongBeat) {
-            targetPool = chordPool; // Prefer chord tones on beat 1 & 3
-        } else {
-            // Passing tones allowed, occasional chromaticism could be added here
-            if (Math.random() < 0.1) {
-                // simple chromatic: previous note +/- 1
-                let chrom = lastNoteMidi + (Math.random() > 0.5 ? 1 : -1);
-                targetPool = [chrom];
-            }
+            targetPool = chordPool;
+        } else if (Math.random() < 0.1) {
+            targetPool = [lastNoteMidi + (Math.random() > 0.5 ? 1 : -1)];
         }
-
-        // --- LOGIC IMPROVEMENT 2: Smooth Contours ---
-        // Find note in pool closest to last note
+        
         let note = findNearest(lastNoteMidi, targetPool);
         
-        // Add some jumps for variety (15% chance)
+        // Occasional leaps
         if (Math.random() < 0.15) {
-            const jump = Math.random() > 0.5 ? 5 : 7; // 4th or 5th
+            const jump = Math.random() > 0.5 ? 5 : 7;
             const dir = Math.random() > 0.5 ? 1 : -1;
-            note = findNearest(lastNoteMidi + (jump*dir), targetPool);
+            note = findNearest(lastNoteMidi + (jump * dir), targetPool);
         }
-
-        // Keep in register (Middle C to E6)
+        
+        // Register lock
         if (note < 60) note += 12;
-        if (note > 80) note -= 12;
-
+        if (note > 84) note -= 12;
+        
         lastNoteMidi = note;
-        const velocity = 0.5 + Math.random() * 0.4; // Humanize velocity
-
-        // Schedule Note
-        synth.triggerAttackRelease(
-            Tone.Frequency(note, "midi"), 
-            "8n", 
-            noteTime, 
-            velocity
-        );
-
-        // UI Feedback
-        Tone.Draw.schedule(() => {
-            document.getElementById('noteLog').innerText = `MIDI: ${note}`;
-        }, noteTime);
+        
+        const velocity = humanizeVelocity(0.65, isStrongBeat);
+        const duration = humanizeDuration(eighthDur * 1.2);
+        
+        vibraphone.play(note, noteTime, {
+            gain: velocity * CONFIG.leadVol,
+            duration: duration
+        });
     });
+    
+    // Update UI
+    setTimeout(() => {
+        document.getElementById('currentChord').innerText = chordDef.name;
+        document.getElementById('phraseStatus').innerText = "Improvising...";
+    }, (barStartTime - audioContext.currentTime) * 1000);
 }
 
 /**
  * SCHEDULER
  */
-let loop;
+const SCHEDULE_AHEAD = 0.5; // Schedule 500ms ahead
+const LOOKAHEAD = 0.1;      // Check every 100ms
+
+function scheduler() {
+    const barDuration = getEighthNoteDuration() * 8;
+    
+    // Schedule bars whose start time is within our lookahead window
+    while (startTime + currentBar * barDuration < audioContext.currentTime + SCHEDULE_AHEAD) {
+        const barStartTime = startTime + currentBar * barDuration;
+        // Only schedule if the bar hasn't already passed
+        if (barStartTime > audioContext.currentTime - 0.05) {
+            generateBar(currentBar, barStartTime);
+        }
+        currentBar++;
+    }
+}
 
 function startLoop() {
-    let barCount = 0;
+    startTime = audioContext.currentTime + 0.1;
+    currentBar = 0;
     
-    // Loop every measure (1m)
-    loop = new Tone.Loop((time) => {
-        // Determine where we are in the 4-bar progression
-        let progressionIndex = barCount % 4;
-        
-        generatePhrase(barCount, time, progressionIndex);
-        
-        barCount++;
-    }, "1m").start(0);
-
-    Tone.Transport.start();
+    console.log("Starting playback...");
+    
+    schedulerInterval = setInterval(scheduler, LOOKAHEAD * 1000);
+    scheduler(); // Initial call
+    
     isPlaying = true;
 }
 
 function stopLoop() {
-    if(loop) loop.dispose();
-    Tone.Transport.stop();
+    if (schedulerInterval) {
+        clearInterval(schedulerInterval);
+        schedulerInterval = null;
+    }
+    
+    // Stop all sounds (soundfont-player uses stop())
+    if (vibraphone) vibraphone.stop();
+    if (electricPiano) electricPiano.stop();
+    if (acousticBass) acousticBass.stop();
+    
     isPlaying = false;
     document.getElementById('currentChord').innerText = "—";
     document.getElementById('phraseStatus').innerText = "Stopped";
 }
 
-// UI Event Handlers
+/**
+ * UI EVENT HANDLERS
+ */
 const startBtn = document.getElementById('startBtn');
 
 startBtn.addEventListener('click', async () => {
     if (!isPlaying) {
+        startBtn.disabled = true;
         await initAudio();
         startLoop();
         startBtn.innerHTML = "■ Stop Jazz";
         startBtn.classList.add('playing');
+        startBtn.disabled = false;
     } else {
         stopLoop();
         startBtn.innerHTML = "▶ Start Jazz";
@@ -652,26 +752,20 @@ startBtn.addEventListener('click', async () => {
     }
 });
 
-// Tempo Slider
+// Tempo
 const tempoSlider = document.getElementById('tempoSlider');
 const tempoValue = document.getElementById('tempoValue');
 tempoSlider.addEventListener('input', (e) => {
     CONFIG.tempo = parseInt(e.target.value);
     tempoValue.textContent = CONFIG.tempo;
-    if (audioInitialized) {
-        Tone.Transport.bpm.value = CONFIG.tempo;
-    }
 });
 
-// Swing Slider
+// Swing
 const swingSlider = document.getElementById('swingSlider');
 const swingValue = document.getElementById('swingValue');
 swingSlider.addEventListener('input', (e) => {
     CONFIG.swing = parseInt(e.target.value) / 100;
     swingValue.textContent = e.target.value + '%';
-    if (audioInitialized) {
-        Tone.Transport.swing = CONFIG.swing;
-    }
 });
 
 // Comping Style
@@ -688,41 +782,49 @@ document.getElementById('melodyDensity').addEventListener('change', (e) => {
 const leadVolSlider = document.getElementById('leadVol');
 const leadVolValue = document.getElementById('leadVolValue');
 leadVolSlider.addEventListener('input', (e) => {
-    const percent = parseInt(e.target.value);
-    leadVolValue.textContent = percent + '%';
-    // Convert 0-100 to dB scale (-30 to 0)
-    CONFIG.leadVol = percent === 0 ? -Infinity : -30 + (percent / 100) * 30;
-    if (synth) {
-        synth.volume.value = CONFIG.leadVol;
-    }
+    CONFIG.leadVol = parseInt(e.target.value) / 100;
+    leadVolValue.textContent = e.target.value + '%';
 });
 
-// Bass Volume  
+// Bass Volume
 const bassVolSlider = document.getElementById('bassVol');
 const bassVolValue = document.getElementById('bassVolValue');
 bassVolSlider.addEventListener('input', (e) => {
-    const percent = parseInt(e.target.value);
-    bassVolValue.textContent = percent + '%';
-    CONFIG.bassVol = percent === 0 ? -Infinity : -30 + (percent / 100) * 30;
-    if (bassSynth) {
-        bassSynth.volume.value = CONFIG.bassVol;
-    }
+    CONFIG.bassVol = parseInt(e.target.value) / 100;
+    bassVolValue.textContent = e.target.value + '%';
 });
 
-// Reverb Mix
-const reverbSlider = document.getElementById('reverbMix');
-const reverbValue = document.getElementById('reverbValue');
-reverbSlider.addEventListener('input', (e) => {
-    const percent = parseInt(e.target.value);
-    reverbValue.textContent = percent + '%';
-    CONFIG.reverbMix = percent / 100;
-    if (reverb) {
-        reverb.wet.value = CONFIG.reverbMix;
-    }
+// Humanization Controls
+const timingVarSlider = document.getElementById('timingVar');
+const timingVarValue = document.getElementById('timingVarValue');
+timingVarSlider.addEventListener('input', (e) => {
+    CONFIG.timingVar = parseInt(e.target.value) / 100;
+    timingVarValue.textContent = e.target.value + '%';
+});
+
+const velocityVarSlider = document.getElementById('velocityVar');
+const velocityVarValue = document.getElementById('velocityVarValue');
+velocityVarSlider.addEventListener('input', (e) => {
+    CONFIG.velocityVar = parseInt(e.target.value) / 100;
+    velocityVarValue.textContent = e.target.value + '%';
+});
+
+const lengthVarSlider = document.getElementById('lengthVar');
+const lengthVarValue = document.getElementById('lengthVarValue');
+lengthVarSlider.addEventListener('input', (e) => {
+    CONFIG.lengthVar = parseInt(e.target.value) / 100;
+    lengthVarValue.textContent = e.target.value + '%';
+});
+
+const ghostNotesSlider = document.getElementById('ghostNotes');
+const ghostNotesValue = document.getElementById('ghostNotesValue');
+ghostNotesSlider.addEventListener('input', (e) => {
+    CONFIG.ghostNotes = parseInt(e.target.value) / 100;
+    ghostNotesValue.textContent = e.target.value + '%';
 });
 
 /**
- * RANDOMIZE STYLE
+ * RANDOMIZE
  */
 const compStyles = ['whole', 'charleston', 'bossa', 'driving', 'sparse', 'busy'];
 const melodyDensities = ['sparse', 'moderate', 'busy'];
@@ -732,60 +834,60 @@ function randomInt(min, max) {
 }
 
 function randomizeStyle() {
-    // Tempo: 80-140 (reasonable jazz range, avoiding extremes)
+    // Musical params
     const newTempo = randomInt(80, 140);
     tempoSlider.value = newTempo;
     tempoValue.textContent = newTempo;
     CONFIG.tempo = newTempo;
     
-    // Swing: 15-45% (always some swing, but not extreme)
     const newSwing = randomInt(15, 45);
     swingSlider.value = newSwing;
     swingValue.textContent = newSwing + '%';
     CONFIG.swing = newSwing / 100;
     
-    // Comping Style: random
     const newCompStyle = compStyles[randomInt(0, compStyles.length - 1)];
     document.getElementById('compStyle').value = newCompStyle;
     CONFIG.compStyle = newCompStyle;
     
-    // Melody Density: random
     const newMelodyDensity = melodyDensities[randomInt(0, melodyDensities.length - 1)];
     document.getElementById('melodyDensity').value = newMelodyDensity;
     CONFIG.melodyDensity = newMelodyDensity;
     
-    // Lead Volume: 50-85% (always audible)
-    const newLeadVol = randomInt(50, 85);
+    const newLeadVol = randomInt(55, 90);
     leadVolSlider.value = newLeadVol;
     leadVolValue.textContent = newLeadVol + '%';
-    CONFIG.leadVol = -30 + (newLeadVol / 100) * 30;
+    CONFIG.leadVol = newLeadVol / 100;
     
-    // Bass Volume: 45-80%
-    const newBassVol = randomInt(45, 80);
+    const newBassVol = randomInt(50, 85);
     bassVolSlider.value = newBassVol;
     bassVolValue.textContent = newBassVol + '%';
-    CONFIG.bassVol = -30 + (newBassVol / 100) * 30;
+    CONFIG.bassVol = newBassVol / 100;
     
-    // Reverb: 15-60%
-    const newReverb = randomInt(15, 60);
-    reverbSlider.value = newReverb;
-    reverbValue.textContent = newReverb + '%';
-    CONFIG.reverbMix = newReverb / 100;
+    // Humanization params
+    const newTimingVar = randomInt(20, 70);
+    timingVarSlider.value = newTimingVar;
+    timingVarValue.textContent = newTimingVar + '%';
+    CONFIG.timingVar = newTimingVar / 100;
     
-    // Apply to audio engine if running
-    if (audioInitialized) {
-        Tone.Transport.bpm.value = CONFIG.tempo;
-        Tone.Transport.swing = CONFIG.swing;
-        if (synth) synth.volume.value = CONFIG.leadVol;
-        if (bassSynth) bassSynth.volume.value = CONFIG.bassVol;
-        if (reverb) reverb.wet.value = CONFIG.reverbMix;
-    }
+    const newVelocityVar = randomInt(30, 80);
+    velocityVarSlider.value = newVelocityVar;
+    velocityVarValue.textContent = newVelocityVar + '%';
+    CONFIG.velocityVar = newVelocityVar / 100;
+    
+    const newLengthVar = randomInt(15, 60);
+    lengthVarSlider.value = newLengthVar;
+    lengthVarValue.textContent = newLengthVar + '%';
+    CONFIG.lengthVar = newLengthVar / 100;
+    
+    const newGhostNotes = randomInt(10, 60);
+    ghostNotesSlider.value = newGhostNotes;
+    ghostNotesValue.textContent = newGhostNotes + '%';
+    CONFIG.ghostNotes = newGhostNotes / 100;
 }
 
-// Random Style Button
 document.getElementById('randomBtn').addEventListener('click', randomizeStyle);
 
-// Randomize on page load for unique starting style
+// Randomize on load
 randomizeStyle();
 
 </script>
