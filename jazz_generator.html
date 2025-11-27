@@ -57,6 +57,21 @@
             background: linear-gradient(135deg, #c0392b, #e74c3c);
         }
         
+        button.secondary {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+        }
+        button.secondary:hover {
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
+        }
+        
+        .button-row {
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+        
         .main-container {
             display: flex;
             gap: 20px;
@@ -185,7 +200,10 @@
 <div id="controls">
     <h1>∿ Infinite Jazz Generator</h1>
     <p class="progression">Dm7 → G7 → Cmaj7 → A7</p>
-    <button id="startBtn">▶ Start Jazz</button>
+    <div class="button-row">
+        <button id="startBtn">▶ Start Jazz</button>
+        <button id="randomBtn" class="secondary">🎲 Random Style</button>
+    </div>
 </div>
 
 <div class="main-container">
@@ -702,6 +720,73 @@ reverbSlider.addEventListener('input', (e) => {
         reverb.wet.value = CONFIG.reverbMix;
     }
 });
+
+/**
+ * RANDOMIZE STYLE
+ */
+const compStyles = ['whole', 'charleston', 'bossa', 'driving', 'sparse', 'busy'];
+const melodyDensities = ['sparse', 'moderate', 'busy'];
+
+function randomInt(min, max) {
+    return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
+function randomizeStyle() {
+    // Tempo: 80-140 (reasonable jazz range, avoiding extremes)
+    const newTempo = randomInt(80, 140);
+    tempoSlider.value = newTempo;
+    tempoValue.textContent = newTempo;
+    CONFIG.tempo = newTempo;
+    
+    // Swing: 15-45% (always some swing, but not extreme)
+    const newSwing = randomInt(15, 45);
+    swingSlider.value = newSwing;
+    swingValue.textContent = newSwing + '%';
+    CONFIG.swing = newSwing / 100;
+    
+    // Comping Style: random
+    const newCompStyle = compStyles[randomInt(0, compStyles.length - 1)];
+    document.getElementById('compStyle').value = newCompStyle;
+    CONFIG.compStyle = newCompStyle;
+    
+    // Melody Density: random
+    const newMelodyDensity = melodyDensities[randomInt(0, melodyDensities.length - 1)];
+    document.getElementById('melodyDensity').value = newMelodyDensity;
+    CONFIG.melodyDensity = newMelodyDensity;
+    
+    // Lead Volume: 50-85% (always audible)
+    const newLeadVol = randomInt(50, 85);
+    leadVolSlider.value = newLeadVol;
+    leadVolValue.textContent = newLeadVol + '%';
+    CONFIG.leadVol = -30 + (newLeadVol / 100) * 30;
+    
+    // Bass Volume: 45-80%
+    const newBassVol = randomInt(45, 80);
+    bassVolSlider.value = newBassVol;
+    bassVolValue.textContent = newBassVol + '%';
+    CONFIG.bassVol = -30 + (newBassVol / 100) * 30;
+    
+    // Reverb: 15-60%
+    const newReverb = randomInt(15, 60);
+    reverbSlider.value = newReverb;
+    reverbValue.textContent = newReverb + '%';
+    CONFIG.reverbMix = newReverb / 100;
+    
+    // Apply to audio engine if running
+    if (audioInitialized) {
+        Tone.Transport.bpm.value = CONFIG.tempo;
+        Tone.Transport.swing = CONFIG.swing;
+        if (synth) synth.volume.value = CONFIG.leadVol;
+        if (bassSynth) bassSynth.volume.value = CONFIG.bassVol;
+        if (reverb) reverb.wet.value = CONFIG.reverbMix;
+    }
+}
+
+// Random Style Button
+document.getElementById('randomBtn').addEventListener('click', randomizeStyle);
+
+// Randomize on page load for unique starting style
+randomizeStyle();
 
 </script>
 </body>
