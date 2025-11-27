@@ -199,6 +199,29 @@
             flex: 1;
         }
         
+        /* Checkbox styling */
+        .checkbox-group {
+            margin-top: 10px;
+        }
+        .checkbox-label {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+            font-size: 11px;
+            color: #a0aec0;
+        }
+        .checkbox-label input[type="checkbox"] {
+            width: 16px;
+            height: 16px;
+            accent-color: #e94560;
+            cursor: pointer;
+        }
+        .checkbox-label span {
+            text-transform: none;
+            letter-spacing: 0;
+        }
+        
         /* Loading indicator */
         .loading {
             color: #ffd369;
@@ -277,6 +300,13 @@
                 <option value="electric_guitar_jazz">Jazz Guitar</option>
                 <option value="flute">Flute</option>
             </select>
+        </div>
+        
+        <div class="config-group checkbox-group">
+            <label class="checkbox-label">
+                <input type="checkbox" id="autoSwitch" checked>
+                <span>Auto-switch instrument every 1 min</span>
+            </label>
         </div>
         
         <div class="config-group">
@@ -385,8 +415,16 @@ const CONFIG = {
     melodyDensity: 'moderate',
     leadInstrument: 'tenor_sax',
     leadVol: 0.75,
-    bassVol: 0.70
+    bassVol: 0.70,
+    autoSwitch: true
 };
+
+// Auto-switch state
+const AUTO_SWITCH_INTERVAL = 60; // seconds
+let switchBarCounter = 0; // Count bars since last switch
+let fadeMultiplier = 1.0; // Used for fade in/out during transitions
+let isTransitioning = false;
+let pendingSwitch = false;
 
 /**
  * AUDIO ENGINE (soundfont-player + Web Audio)
@@ -499,12 +537,82 @@ function getEighthNoteDuration() {
     return 60 / CONFIG.tempo / 2; // seconds per eighth note
 }
 
+// Pick a random instrument different from the current one
+function getRandomDifferentInstrument() {
+    const available = leadInstruments.filter(i => i !== CONFIG.leadInstrument);
+    return available[Math.floor(Math.random() * available.length)];
+}
+
+// Calculate bars needed for switch interval based on tempo
+function getBarsForSwitchInterval() {
+    const barDuration = getEighthNoteDuration() * 8;
+    return Math.floor(AUTO_SWITCH_INTERVAL / barDuration);
+}
+
+// Handle automatic instrument switching
+function checkAutoSwitch() {
+    if (!CONFIG.autoSwitch || isTransitioning || pendingSwitch) return;
+    
+    const barsNeeded = getBarsForSwitchInterval();
+    const barsUntilSwitch = barsNeeded - switchBarCounter;
+    
+    // Start fade out in the last 2 bars before switch
+    if (barsUntilSwitch <= 2 && barsUntilSwitch > 0) {
+        fadeMultiplier = barsUntilSwitch / 2; // Fade from 1 to 0
+    }
+    
+    // Fade in during first 2 bars after switch
+    if (switchBarCounter <= 2 && switchBarCounter > 0) {
+        fadeMultiplier = Math.min(1, switchBarCounter / 2 + 0.3);
+    }
+    
+    // Time to switch! Trigger async load
+    if (switchBarCounter >= barsNeeded) {
+        triggerInstrumentSwitch();
+    }
+}
+
+// Async instrument switch
+async function triggerInstrumentSwitch() {
+    if (isTransitioning || pendingSwitch) return;
+    pendingSwitch = true;
+    isTransitioning = true;
+    
+    // Pick new instrument
+    const newInstrument = getRandomDifferentInstrument();
+    CONFIG.leadInstrument = newInstrument;
+    document.getElementById('leadInstrument').value = newInstrument;
+    
+    console.log(`Auto-switching to: ${newInstrument}`);
+    
+    // Load new instrument
+    try {
+        const newLeadInstrument = await Soundfont.instrument(audioContext, newInstrument, { 
+            soundfont: 'MusyngKite' 
+        });
+        leadInstrument = newLeadInstrument;
+        
+        // Update UI
+        const displayName = newInstrument.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+        document.getElementById('phraseStatus').textContent = `♪ ${displayName}`;
+    } catch (e) {
+        console.error("Error loading instrument:", e);
+    }
+    
+    switchBarCounter = 0;
+    fadeMultiplier = 0.3; // Start fade in
+    isTransitioning = false;
+    pendingSwitch = false;
+}
+
 function generateBar(barIndex, barStartTime) {
     const chordIdx = barIndex % 4;
     const chordDef = CHORD_PROGRESSION[chordIdx];
     const eighthDur = getEighthNoteDuration();
     
-    console.log(`Bar ${barIndex}: ${chordDef.name}, startTime=${barStartTime.toFixed(2)}, currentTime=${audioContext.currentTime.toFixed(2)}`);
+    // Increment bar counter and check for auto-switch
+    switchBarCounter++;
+    checkAutoSwitch();
     
     // Apply swing to off-beats
     function getSwungTime(beatIndex) {
@@ -618,7 +726,7 @@ function generateBar(barIndex, barStartTime) {
         const duration = eighthDur * 1.2;
         
         leadInstrument.play(note, noteTime, {
-            gain: velocity * CONFIG.leadVol,
+            gain: velocity * CONFIG.leadVol * fadeMultiplier,
             duration: duration
         });
     });
@@ -653,6 +761,10 @@ function scheduler() {
 function startLoop() {
     startTime = audioContext.currentTime + 0.1;
     currentBar = 0;
+    switchBarCounter = 0;
+    fadeMultiplier = 1.0;
+    isTransitioning = false;
+    pendingSwitch = false;
     
     console.log("Starting playback...");
     
@@ -723,6 +835,16 @@ document.getElementById('compStyle').addEventListener('change', (e) => {
 document.getElementById('leadInstrument').addEventListener('change', async (e) => {
     CONFIG.leadInstrument = e.target.value;
     await reloadLeadInstrument();
+    // Reset auto-switch timer when manually changed
+    switchBarCounter = 0;
+});
+
+// Auto-switch checkbox
+document.getElementById('autoSwitch').addEventListener('change', (e) => {
+    CONFIG.autoSwitch = e.target.checked;
+    if (e.target.checked) {
+        switchBarCounter = 0; // Reset timer when enabled
+    }
 });
 
 // Melody Density
