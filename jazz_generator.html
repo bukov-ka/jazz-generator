@@ -81,7 +81,7 @@
             gap: 20px;
             flex-wrap: wrap;
             justify-content: center;
-            max-width: 900px;
+            max-width: 700px;
         }
         
         #display { 
@@ -199,17 +199,6 @@
             flex: 1;
         }
         
-        /* Humanization panel special color */
-        .humanize-panel {
-            border-color: #48bb78;
-        }
-        .humanize-panel .config-title {
-            color: #48bb78;
-        }
-        .humanize-panel input[type="range"]::-webkit-slider-thumb {
-            background: #48bb78;
-        }
-        
         /* Loading indicator */
         .loading {
             color: #ffd369;
@@ -307,50 +296,6 @@
         </div>
     </div>
     
-    <!-- Humanization Panel -->
-    <div class="config-panel humanize-panel">
-        <div class="config-title">🎭 Humanization</div>
-        
-        <div class="config-group">
-            <label>Timing Variation</label>
-            <input type="range" id="timingVar" min="0" max="100" value="40">
-            <div class="range-labels">
-                <span>Robot</span>
-                <span class="range-value" id="timingVarValue">40%</span>
-                <span>Loose</span>
-            </div>
-        </div>
-        
-        <div class="config-group">
-            <label>Velocity Variation</label>
-            <input type="range" id="velocityVar" min="0" max="100" value="50">
-            <div class="range-labels">
-                <span>Flat</span>
-                <span class="range-value" id="velocityVarValue">50%</span>
-                <span>Dynamic</span>
-            </div>
-        </div>
-        
-        <div class="config-group">
-            <label>Note Length Variation</label>
-            <input type="range" id="lengthVar" min="0" max="100" value="35">
-            <div class="range-labels">
-                <span>Exact</span>
-                <span class="range-value" id="lengthVarValue">35%</span>
-                <span>Loose</span>
-            </div>
-        </div>
-        
-        <div class="config-group">
-            <label>Ghost Notes (Bass)</label>
-            <input type="range" id="ghostNotes" min="0" max="100" value="30">
-            <div class="range-labels">
-                <span>None</span>
-                <span class="range-value" id="ghostNotesValue">30%</span>
-                <span>Many</span>
-            </div>
-        </div>
-    </div>
 </div>
 
 <script src="https://unpkg.com/soundfont-player@0.12.0/dist/soundfont-player.min.js"></script>
@@ -425,12 +370,7 @@ const CONFIG = {
     compStyle: 'charleston',
     melodyDensity: 'moderate',
     leadVol: 0.75,
-    bassVol: 0.70,
-    // Humanization
-    timingVar: 0.40,      // 0-1: timing randomization (max ±30ms)
-    velocityVar: 0.50,    // 0-1: velocity variation
-    lengthVar: 0.35,      // 0-1: note length variation
-    ghostNotes: 0.30,     // 0-1: probability of ghost notes on bass
+    bassVol: 0.70
 };
 
 /**
@@ -489,34 +429,6 @@ async function initAudio() {
 }
 
 /**
- * HUMANIZATION HELPERS
- */
-function humanizeTime(baseTime) {
-    // Add ±30ms timing variation scaled by CONFIG.timingVar
-    const maxOffset = 0.030 * CONFIG.timingVar;
-    return baseTime + (Math.random() - 0.5) * 2 * maxOffset;
-}
-
-function humanizeVelocity(baseVelocity, isAccent = false) {
-    // Base velocity with variation
-    const variation = CONFIG.velocityVar * 0.4; // Max ±40% variation
-    let vel = baseVelocity + (Math.random() - 0.5) * 2 * variation * baseVelocity;
-    
-    // Accents get a boost
-    if (isAccent) vel *= 1.15;
-    
-    // Clamp between 0.2 and 1.0
-    return Math.max(0.2, Math.min(1.0, vel));
-}
-
-function humanizeDuration(baseDuration) {
-    // Vary note length by ±30%
-    const variation = CONFIG.lengthVar * 0.3;
-    const multiplier = 1 + (Math.random() - 0.5) * 2 * variation;
-    return baseDuration * multiplier;
-}
-
-/**
  * GENERATOR LOGIC
  */
 function getMidi(pc, octave) { return pc + (octave + 1) * 12; }
@@ -563,14 +475,13 @@ function generateBar(barIndex, barStartTime) {
     const compPattern = randomEl(compPatterns);
     
     compPattern.forEach(hit => {
-        const hitTime = humanizeTime(getSwungTime(hit.beat));
-        const vel = humanizeVelocity(0.45, hit.beat === 0);
-        const dur = humanizeDuration(hit.dur);
+        const hitTime = getSwungTime(hit.beat);
+        const vel = hit.beat === 0 ? 0.52 : 0.45;  // Slightly accent downbeat
         
         voicing.forEach(midi => {
             electricPiano.play(midi, hitTime, {
                 gain: vel * CONFIG.leadVol * 0.7,
-                duration: dur
+                duration: hit.dur
             });
         });
     });
@@ -578,53 +489,35 @@ function generateBar(barIndex, barStartTime) {
     // ============ 2. WALKING BASS ============
     const bassOctave = 2;
     const rootMidi = getMidi(chordDef.root, bassOctave);
-    const bassDur = eighthDur * 1.8; // Slightly longer than eighth
+    const bassDur = eighthDur * 1.8;
     
     // Beat 1: Root (strong)
-    acousticBass.play(rootMidi, humanizeTime(getSwungTime(0)), {
-        gain: humanizeVelocity(0.85, true) * CONFIG.bassVol,
-        duration: humanizeDuration(bassDur)
+    acousticBass.play(rootMidi, getSwungTime(0), {
+        gain: 0.85 * CONFIG.bassVol,
+        duration: bassDur
     });
-    
-    // Ghost note before beat 2 (if enabled)
-    if (Math.random() < CONFIG.ghostNotes * 0.5) {
-        const ghostNote = rootMidi + (Math.random() > 0.5 ? 2 : -2);
-        acousticBass.play(ghostNote, humanizeTime(getSwungTime(1)), {
-            gain: humanizeVelocity(0.25) * CONFIG.bassVol,
-            duration: eighthDur * 0.4
-        });
-    }
     
     // Beat 2: 3rd or 5th
     const beat2Note = getMidi(randomEl([chordDef.tones[1], chordDef.tones[2]]), bassOctave);
-    acousticBass.play(beat2Note, humanizeTime(getSwungTime(2)), {
-        gain: humanizeVelocity(0.7) * CONFIG.bassVol,
-        duration: humanizeDuration(bassDur)
+    acousticBass.play(beat2Note, getSwungTime(2), {
+        gain: 0.75 * CONFIG.bassVol,
+        duration: bassDur
     });
-    
-    // Ghost note before beat 3
-    if (Math.random() < CONFIG.ghostNotes * 0.4) {
-        const ghostNote = beat2Note + (Math.random() > 0.5 ? 1 : -1);
-        acousticBass.play(ghostNote, humanizeTime(getSwungTime(3)), {
-            gain: humanizeVelocity(0.22) * CONFIG.bassVol,
-            duration: eighthDur * 0.35
-        });
-    }
     
     // Beat 3: 5th
     const fifthMidi = getMidi(chordDef.tones[2], bassOctave);
-    acousticBass.play(fifthMidi, humanizeTime(getSwungTime(4)), {
-        gain: humanizeVelocity(0.72) * CONFIG.bassVol,
-        duration: humanizeDuration(bassDur)
+    acousticBass.play(fifthMidi, getSwungTime(4), {
+        gain: 0.72 * CONFIG.bassVol,
+        duration: bassDur
     });
     
     // Beat 4: Chromatic approach
     const nextChord = CHORD_PROGRESSION[(chordIdx + 1) % 4];
     const nextRoot = getMidi(nextChord.root, bassOctave);
     const approachNote = nextRoot + (Math.random() > 0.5 ? 1 : -1);
-    acousticBass.play(approachNote, humanizeTime(getSwungTime(6)), {
-        gain: humanizeVelocity(0.68) * CONFIG.bassVol,
-        duration: humanizeDuration(bassDur * 0.9)
+    acousticBass.play(approachNote, getSwungTime(6), {
+        gain: 0.70 * CONFIG.bassVol,
+        duration: bassDur * 0.9
     });
     
     // ============ 3. MELODY ============
@@ -640,7 +533,7 @@ function generateBar(barIndex, barStartTime) {
     pattern.forEach((step, index) => {
         if (step === 0) return;
         
-        const noteTime = humanizeTime(getSwungTime(index));
+        const noteTime = getSwungTime(index);
         const isStrongBeat = (index === 0 || index === 4);
         
         // Pitch selection
@@ -668,8 +561,8 @@ function generateBar(barIndex, barStartTime) {
         
         lastNoteMidi = note;
         
-        const velocity = humanizeVelocity(0.65, isStrongBeat);
-        const duration = humanizeDuration(eighthDur * 1.2);
+        const velocity = isStrongBeat ? 0.7 : 0.65;
+        const duration = eighthDur * 1.2;
         
         vibraphone.play(note, noteTime, {
             gain: velocity * CONFIG.leadVol,
@@ -794,35 +687,6 @@ bassVolSlider.addEventListener('input', (e) => {
     bassVolValue.textContent = e.target.value + '%';
 });
 
-// Humanization Controls
-const timingVarSlider = document.getElementById('timingVar');
-const timingVarValue = document.getElementById('timingVarValue');
-timingVarSlider.addEventListener('input', (e) => {
-    CONFIG.timingVar = parseInt(e.target.value) / 100;
-    timingVarValue.textContent = e.target.value + '%';
-});
-
-const velocityVarSlider = document.getElementById('velocityVar');
-const velocityVarValue = document.getElementById('velocityVarValue');
-velocityVarSlider.addEventListener('input', (e) => {
-    CONFIG.velocityVar = parseInt(e.target.value) / 100;
-    velocityVarValue.textContent = e.target.value + '%';
-});
-
-const lengthVarSlider = document.getElementById('lengthVar');
-const lengthVarValue = document.getElementById('lengthVarValue');
-lengthVarSlider.addEventListener('input', (e) => {
-    CONFIG.lengthVar = parseInt(e.target.value) / 100;
-    lengthVarValue.textContent = e.target.value + '%';
-});
-
-const ghostNotesSlider = document.getElementById('ghostNotes');
-const ghostNotesValue = document.getElementById('ghostNotesValue');
-ghostNotesSlider.addEventListener('input', (e) => {
-    CONFIG.ghostNotes = parseInt(e.target.value) / 100;
-    ghostNotesValue.textContent = e.target.value + '%';
-});
-
 /**
  * RANDOMIZE
  */
@@ -862,27 +726,6 @@ function randomizeStyle() {
     bassVolSlider.value = newBassVol;
     bassVolValue.textContent = newBassVol + '%';
     CONFIG.bassVol = newBassVol / 100;
-    
-    // Humanization params
-    const newTimingVar = randomInt(20, 70);
-    timingVarSlider.value = newTimingVar;
-    timingVarValue.textContent = newTimingVar + '%';
-    CONFIG.timingVar = newTimingVar / 100;
-    
-    const newVelocityVar = randomInt(30, 80);
-    velocityVarSlider.value = newVelocityVar;
-    velocityVarValue.textContent = newVelocityVar + '%';
-    CONFIG.velocityVar = newVelocityVar / 100;
-    
-    const newLengthVar = randomInt(15, 60);
-    lengthVarSlider.value = newLengthVar;
-    lengthVarValue.textContent = newLengthVar + '%';
-    CONFIG.lengthVar = newLengthVar / 100;
-    
-    const newGhostNotes = randomInt(10, 60);
-    ghostNotesSlider.value = newGhostNotes;
-    ghostNotesValue.textContent = newGhostNotes + '%';
-    CONFIG.ghostNotes = newGhostNotes / 100;
 }
 
 document.getElementById('randomBtn').addEventListener('click', randomizeStyle);
