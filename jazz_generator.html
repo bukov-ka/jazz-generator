@@ -266,6 +266,20 @@
         </div>
         
         <div class="config-group">
+            <label>Lead Instrument</label>
+            <select id="leadInstrument">
+                <option value="tenor_sax" selected>Tenor Saxophone</option>
+                <option value="alto_sax">Alto Saxophone</option>
+                <option value="soprano_sax">Soprano Saxophone</option>
+                <option value="trumpet">Trumpet</option>
+                <option value="trombone">Trombone</option>
+                <option value="vibraphone">Vibraphone</option>
+                <option value="electric_guitar_jazz">Jazz Guitar</option>
+                <option value="flute">Flute</option>
+            </select>
+        </div>
+        
+        <div class="config-group">
             <label>Melody Density</label>
             <select id="melodyDensity">
                 <option value="sparse">Sparse (Space)</option>
@@ -369,15 +383,16 @@ const CONFIG = {
     swing: 0.3,
     compStyle: 'charleston',
     melodyDensity: 'moderate',
+    leadInstrument: 'tenor_sax',
     leadVol: 0.75,
     bassVol: 0.70
 };
 
 /**
- * AUDIO ENGINE (smplr + Web Audio)
+ * AUDIO ENGINE (soundfont-player + Web Audio)
  */
 let audioContext;
-let vibraphone, electricPiano, acousticBass;
+let leadInstrument, electricPiano, acousticBass;
 let isPlaying = false;
 let audioInitialized = false;
 let schedulerInterval = null;
@@ -409,8 +424,8 @@ async function initAudio() {
         // Using MusyngKite soundfont for good quality
         const sf = 'MusyngKite';
         
-        [vibraphone, electricPiano, acousticBass] = await Promise.all([
-            Soundfont.instrument(audioContext, 'vibraphone', { soundfont: sf }),
+        [leadInstrument, electricPiano, acousticBass] = await Promise.all([
+            Soundfont.instrument(audioContext, CONFIG.leadInstrument, { soundfont: sf }),
             Soundfont.instrument(audioContext, 'electric_piano_1', { soundfont: sf }),
             Soundfont.instrument(audioContext, 'acoustic_bass', { soundfont: sf })
         ]);
@@ -425,6 +440,44 @@ async function initAudio() {
         statusEl.textContent = "Error: " + e.message;
         statusEl.classList.remove('loading');
         throw e;
+    }
+}
+
+// Function to reload lead instrument when changed
+async function reloadLeadInstrument() {
+    if (!audioInitialized) return;
+    
+    const statusEl = document.getElementById('phraseStatus');
+    const wasPlaying = isPlaying;
+    
+    // Stop if playing
+    if (isPlaying) {
+        stopLoop();
+    }
+    
+    statusEl.textContent = "Loading instrument...";
+    statusEl.classList.add('loading');
+    
+    try {
+        // Load new instrument
+        leadInstrument = await Soundfont.instrument(audioContext, CONFIG.leadInstrument, { 
+            soundfont: 'MusyngKite' 
+        });
+        
+        console.log("Loaded instrument:", CONFIG.leadInstrument);
+        statusEl.textContent = wasPlaying ? "Playing..." : "Ready to swing!";
+        statusEl.classList.remove('loading');
+        
+        // Resume if was playing
+        if (wasPlaying) {
+            startLoop();
+            document.getElementById('startBtn').innerHTML = "■ Stop Jazz";
+            document.getElementById('startBtn').classList.add('playing');
+        }
+    } catch (e) {
+        console.error("Error loading instrument:", e);
+        statusEl.textContent = "Error loading instrument";
+        statusEl.classList.remove('loading');
     }
 }
 
@@ -564,7 +617,7 @@ function generateBar(barIndex, barStartTime) {
         const velocity = isStrongBeat ? 0.7 : 0.65;
         const duration = eighthDur * 1.2;
         
-        vibraphone.play(note, noteTime, {
+        leadInstrument.play(note, noteTime, {
             gain: velocity * CONFIG.leadVol,
             duration: duration
         });
@@ -616,7 +669,7 @@ function stopLoop() {
     }
     
     // Stop all sounds (soundfont-player uses stop())
-    if (vibraphone) vibraphone.stop();
+    if (leadInstrument) leadInstrument.stop();
     if (electricPiano) electricPiano.stop();
     if (acousticBass) acousticBass.stop();
     
@@ -666,6 +719,12 @@ document.getElementById('compStyle').addEventListener('change', (e) => {
     CONFIG.compStyle = e.target.value;
 });
 
+// Lead Instrument
+document.getElementById('leadInstrument').addEventListener('change', async (e) => {
+    CONFIG.leadInstrument = e.target.value;
+    await reloadLeadInstrument();
+});
+
 // Melody Density
 document.getElementById('melodyDensity').addEventListener('change', (e) => {
     CONFIG.melodyDensity = e.target.value;
@@ -692,12 +751,13 @@ bassVolSlider.addEventListener('input', (e) => {
  */
 const compStyles = ['whole', 'charleston', 'bossa', 'driving', 'sparse', 'busy'];
 const melodyDensities = ['sparse', 'moderate', 'busy'];
+const leadInstruments = ['tenor_sax', 'alto_sax', 'soprano_sax', 'trumpet', 'trombone', 'vibraphone', 'electric_guitar_jazz', 'flute'];
 
 function randomInt(min, max) {
     return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 
-function randomizeStyle() {
+async function randomizeStyle() {
     // Musical params
     const newTempo = randomInt(80, 140);
     tempoSlider.value = newTempo;
@@ -712,6 +772,14 @@ function randomizeStyle() {
     const newCompStyle = compStyles[randomInt(0, compStyles.length - 1)];
     document.getElementById('compStyle').value = newCompStyle;
     CONFIG.compStyle = newCompStyle;
+    
+    const newLeadInstrument = leadInstruments[randomInt(0, leadInstruments.length - 1)];
+    document.getElementById('leadInstrument').value = newLeadInstrument;
+    CONFIG.leadInstrument = newLeadInstrument;
+    // Reload instrument if audio is initialized
+    if (audioInitialized) {
+        await reloadLeadInstrument();
+    }
     
     const newMelodyDensity = melodyDensities[randomInt(0, melodyDensities.length - 1)];
     document.getElementById('melodyDensity').value = newMelodyDensity;
@@ -728,7 +796,9 @@ function randomizeStyle() {
     CONFIG.bassVol = newBassVol / 100;
 }
 
-document.getElementById('randomBtn').addEventListener('click', randomizeStyle);
+document.getElementById('randomBtn').addEventListener('click', () => {
+    randomizeStyle();
+});
 
 // Randomize on load
 randomizeStyle();
