@@ -237,7 +237,7 @@
 
 <div id="controls">
     <h1>∿ Infinite Jazz Generator</h1>
-    <p class="progression">Dm7 → G7 → Cmaj7 → A7</p>
+    <p class="progression" id="progressionDisplay">Dm7 → G7 → Cmaj7 → A7</p>
     <div class="button-row">
         <button id="startBtn">▶ Start Jazz</button>
         <button id="randomBtn" class="secondary">🎲 Random Style</button>
@@ -285,6 +285,24 @@
                 <option value="driving">Driving Quarters</option>
                 <option value="sparse">Sparse / Breathe</option>
                 <option value="busy">Busy Bebop</option>
+            </select>
+        </div>
+        
+        <div class="config-group">
+            <label>Key</label>
+            <select id="keySelect">
+                <option value="0">C Major</option>
+                <option value="1">D♭ Major</option>
+                <option value="2">D Major</option>
+                <option value="3">E♭ Major</option>
+                <option value="4">E Major</option>
+                <option value="5">F Major</option>
+                <option value="6">G♭ Major</option>
+                <option value="7">G Major</option>
+                <option value="8">A♭ Major</option>
+                <option value="9">A Major</option>
+                <option value="10">B♭ Major</option>
+                <option value="11">B Major</option>
             </select>
         </div>
         
@@ -348,18 +366,66 @@
  * CONFIGURATION & THEORY
  */
 
-// Musical Constants
-const SCALES = {
-    "C_MAJOR": [0, 2, 4, 5, 7, 9, 11],
-    "A_PHRYGIAN_DOM": [9, 10, 1, 2, 4, 5, 7]
+// Musical Constants - Note names for display
+const NOTE_NAMES = ['C', 'D♭', 'D', 'E♭', 'E', 'F', 'G♭', 'G', 'A♭', 'A', 'B♭', 'B'];
+const NOTE_NAMES_SHARP = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+
+// Interval templates (relative to key root)
+const MAJOR_SCALE_INTERVALS = [0, 2, 4, 5, 7, 9, 11];
+const PHRYGIAN_DOM_INTERVALS = [0, 1, 4, 5, 7, 8, 10]; // For the VI7 chord
+
+// Chord type intervals (root, 3rd, 5th, 7th)
+const CHORD_INTERVALS = {
+    'm7':   [0, 3, 7, 10],   // minor 7th
+    '7':    [0, 4, 7, 10],   // dominant 7th
+    'maj7': [0, 4, 7, 11]    // major 7th
 };
 
-const CHORD_PROGRESSION = [
-    { name: "Dm7",   root: 2,  type: "m7",   scale: "C_MAJOR",        tones: [2, 5, 9, 0] },
-    { name: "G7",    root: 7,  type: "7",    scale: "C_MAJOR",        tones: [7, 11, 2, 5] },
-    { name: "Cmaj7", root: 0,  type: "maj7", scale: "C_MAJOR",        tones: [0, 4, 7, 11] },
-    { name: "A7",    root: 9,  type: "7",    scale: "A_PHRYGIAN_DOM", tones: [9, 1, 4, 7] }
+// ii-V-I-VI progression structure (scale degrees relative to key)
+const PROGRESSION_TEMPLATE = [
+    { degree: 2,  type: 'm7',   suffix: 'm7',   usePhrygianDom: false },  // ii
+    { degree: 7,  type: '7',    suffix: '7',    usePhrygianDom: false },  // V
+    { degree: 0,  type: 'maj7', suffix: 'maj7', usePhrygianDom: false },  // I
+    { degree: 9,  type: '7',    suffix: '7',    usePhrygianDom: true }    // VI (secondary dominant)
 ];
+
+// Current key (0 = C)
+let currentKey = 0;
+
+// Generate scales for current key
+function getScales() {
+    const majorScale = MAJOR_SCALE_INTERVALS.map(i => (i + currentKey) % 12);
+    const vi7Root = (currentKey + 9) % 12; // A in key of C
+    const phrygianDom = PHRYGIAN_DOM_INTERVALS.map(i => (i + vi7Root) % 12);
+    return {
+        "MAJOR": majorScale,
+        "PHRYGIAN_DOM": phrygianDom
+    };
+}
+
+// Generate chord progression for current key
+function getChordProgression() {
+    const scales = getScales();
+    return PROGRESSION_TEMPLATE.map(template => {
+        const root = (currentKey + template.degree) % 12;
+        const intervals = CHORD_INTERVALS[template.type];
+        const tones = intervals.map(i => (root + i) % 12);
+        const name = NOTE_NAMES[root] + template.suffix;
+        const scale = template.usePhrygianDom ? "PHRYGIAN_DOM" : "MAJOR";
+        return { name, root, type: template.type, scale, tones };
+    });
+}
+
+// Dynamic accessors
+function SCALES() { return getScales(); }
+function CHORD_PROGRESSION() { return getChordProgression(); }
+
+// Update progression display in UI
+function updateProgressionDisplay() {
+    const progression = getChordProgression();
+    const displayText = progression.map(c => c.name).join(' → ');
+    document.getElementById('progressionDisplay').textContent = displayText;
+}
 
 // Melody Rhythm Patterns
 const MELODY_RHYTHMS = {
@@ -607,7 +673,7 @@ async function triggerInstrumentSwitch() {
 
 function generateBar(barIndex, barStartTime) {
     const chordIdx = barIndex % 4;
-    const chordDef = CHORD_PROGRESSION[chordIdx];
+    const chordDef = CHORD_PROGRESSION()[chordIdx];
     const eighthDur = getEighthNoteDuration();
     
     // Increment bar counter and check for auto-switch
@@ -673,7 +739,7 @@ function generateBar(barIndex, barStartTime) {
     });
     
     // Beat 4: Chromatic approach
-    const nextChord = CHORD_PROGRESSION[(chordIdx + 1) % 4];
+    const nextChord = CHORD_PROGRESSION()[(chordIdx + 1) % 4];
     const nextRoot = getMidi(nextChord.root, bassOctave);
     const approachNote = nextRoot + (Math.random() > 0.5 ? 1 : -1);
     acousticBass.play(approachNote, getSwungTime(6), {
@@ -685,8 +751,8 @@ function generateBar(barIndex, barStartTime) {
     const melodyPatterns = MELODY_RHYTHMS[CONFIG.melodyDensity];
     const pattern = randomEl(melodyPatterns);
     
-    const scalePool = SCALES[chordDef.scale].map(pc => getMidi(pc, 4))
-        .concat(SCALES[chordDef.scale].map(pc => getMidi(pc, 5)));
+    const scalePool = SCALES()[chordDef.scale].map(pc => getMidi(pc, 4))
+        .concat(SCALES()[chordDef.scale].map(pc => getMidi(pc, 5)));
     const chordPool = chordDef.tones.map(pc => getMidi(pc, 4))
         .concat(chordDef.tones.map(pc => getMidi(pc, 5)));
     const guideTones = [chordDef.tones[1], chordDef.tones[3]].map(pc => getMidi(pc, 4));
@@ -847,6 +913,12 @@ document.getElementById('autoSwitch').addEventListener('change', (e) => {
     }
 });
 
+// Key selection
+document.getElementById('keySelect').addEventListener('change', (e) => {
+    currentKey = parseInt(e.target.value);
+    updateProgressionDisplay();
+});
+
 // Melody Density
 document.getElementById('melodyDensity').addEventListener('change', (e) => {
     CONFIG.melodyDensity = e.target.value;
@@ -885,6 +957,12 @@ async function randomizeStyle() {
     tempoSlider.value = newTempo;
     tempoValue.textContent = newTempo;
     CONFIG.tempo = newTempo;
+    
+    // Randomize key
+    const newKey = randomInt(0, 11);
+    document.getElementById('keySelect').value = newKey;
+    currentKey = newKey;
+    updateProgressionDisplay();
     
     const newSwing = randomInt(15, 45);
     swingSlider.value = newSwing;
